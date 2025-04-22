@@ -305,7 +305,9 @@ const scrapePotakaIT = async (product) => {
         $(element).find(".price-normal").text().trim() ||
         "Out Of Stock";
       const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
+        $(element).find(".product-img img").attr("data-src") ||
+        $(element).find(".product-img img").attr("data-lazy") ||
+        "Image not found";
       const link =
         $(element).find(".product-img").attr("href") || "Link not found";
 
