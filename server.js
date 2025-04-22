@@ -10,187 +10,187 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  handler: (req, res) => {
-    res.status(429).json({
-      success: false,
-      message:
-        "You're sending too many requests. Please wait a minute and try again.",
-    });
-  },
+    windowMs: 1 * 60 * 1000,
+    max: 10,
+    handler: (req, res) => {
+        res.status(429).json({
+            success: false,
+            message:
+                "You're sending too many requests. Please wait a minute and try again.",
+        });
+    },
 });
 
 app.use(limiter);
 // Scraper for StarTech
 const scrapeStarTech = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.startech.com.bd/product/search?search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".brand img").attr("src") || "logo not found";
-    $(".p-item").each((index, element) => {
-      const name =
-        $(element).find(".p-item-name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() ||
-        $(element).find(".p-item-price").text().trim() ||
-        "Out Of Stock";
+    try {
+        const response = await axios.get(
+            `https://www.startech.com.bd/product/search?search=${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $(".brand img").attr("src") || "logo not found";
+        $(".p-item").each((index, element) => {
+            const name =
+                $(element).find(".p-item-name").text().trim() || "Name not found";
+            const price =
+                $(element).find(".price-new").text().trim() ||
+                $(element).find(".p-item-price").text().trim() ||
+                "Out Of Stock";
 
-      const img =
-        $(element).find(".p-item-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".p-item-img a").attr("href") || "Link not found";
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const img =
+                $(element).find(".p-item-img img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".p-item-img a").attr("href") || "Link not found";
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping StarTech:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping StarTech:", error);
+        return [];
+    }
 };
 
 // Scraper for TechLand
 const scrapeTechLand = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.techlandbd.com/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".image img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    try {
+        const response = await axios.get(
+            `https://www.techlandbd.com/index.php?route=product/search&search=${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $("#logo img").attr("src") || "logo not found";
+        $(".product-layout").each((index, element) => {
+            const name = $(element).find(".name").text().trim() || "Name not found";
+            const price =
+                $(element).find(".price-new").text().trim() || "Out Of Stock";
+            const img =
+                $(element).find(".image img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".product-img").attr("href") || "Link not found";
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping TechLand:", error);
+        return [];
+    }
 };
 const scrapeRyans = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.ryans.com/search?q=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".main-logo img").attr("src") || "logo not found";
-    $(".category-single-product").each((index, element) => {
-      const name =
-        $(element).find(".card-text a").text().trim() || "Name not found";
-      const price = $(element).find(".pr-text").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".image-box img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".image-box a").attr("href") || "Link not found";
+    try {
+        const response = await axios.get(
+            `https://www.ryans.com/search?q=${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $(".main-logo img").attr("src") || "logo not found";
+        $(".category-single-product").each((index, element) => {
+            const name =
+                $(element).find(".card-text a").text().trim() || "Name not found";
+            const price = $(element).find(".pr-text").text().trim() || "Out Of Stock";
+            const img =
+                $(element).find(".image-box img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".image-box a").attr("href") || "Link not found";
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping TechLand:", error);
+        return [];
+    }
 };
 const scrapeBinary = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.binarylogic.com.bd/search/${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".homepage_two__log svg").attr("src") || "logo not found";
-    $(".single_product").each((index, element) => {
-      const name =
-        $(element).find(".p-item-name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".current_price").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".p-item-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".p-item-img a").attr("href") || "Link not found";
+    try {
+        const response = await axios.get(
+            `https://www.binarylogic.com.bd/search/${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $(".homepage_two__log svg").attr("src") || "logo not found";
+        $(".single_product").each((index, element) => {
+            const name =
+                $(element).find(".p-item-name").text().trim() || "Name not found";
+            const price =
+                $(element).find(".current_price").text().trim() || "Out Of Stock";
+            const img =
+                $(element).find(".p-item-img img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".p-item-img a").attr("href") || "Link not found";
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping TechLand:", error);
+        return [];
+    }
 };
 const scrapePcHouse = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.pchouse.com.bd/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    try {
+        const response = await axios.get(
+            `https://www.pchouse.com.bd/index.php?route=product/search&search=${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $("#logo img").attr("src") || "logo not found";
+        $(".product-layout").each((index, element) => {
+            const name = $(element).find(".name").text().trim() || "Name not found";
+            const price =
+                $(element).find(".price-new").text().trim() || "Out Of Stock";
+            const img =
+                $(element).find(".product-img img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".product-img").attr("href") || "Link not found";
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping TechLand:", error);
+        return [];
+    }
 };
 
 const scrapeUltraTech = async (product) => {
-  try {
-    const response = await axios.get(
-      `https://www.ultratech.com.bd/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    try {
+        const response = await axios.get(
+            `https://www.ultratech.com.bd/index.php?route=product/search&search=${product}`
+        );
+        const $ = cheerio.load(response.data);
+        const products = [];
+        const logo = $("#logo img").attr("src") || "logo not found";
+        $(".product-layout").each((index, element) => {
+            const name = $(element).find(".name").text().trim() || "Name not found";
+            const price =
+                $(element).find(".price-new").text().trim() || "Out Of Stock";
+            const img =
+                $(element).find(".product-img img").attr("src") || "Image not found";
+            const link =
+                $(element).find(".product-img").attr("href") || "Link not found";
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+            const id = crypto.randomUUID();
+            products.push({id, name, price, img, link});
+        });
 
-    return { products, logo };
-  } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return [];
-  }
+        return {products, logo};
+    } catch (error) {
+        console.error("Error scraping TechLand:", error);
+        return [];
+    }
 };
 // const scrapeVibeGaming = async (product) => {
 //   try {
@@ -319,6 +319,32 @@ const scrapePotakaIT = async (product) => {
     return [];
   }
 };
+const scrapGadgetAndGears = async (searchTerm) => {
+
+    try {
+        // API call with Axios
+        const response = await axios.get('https://api-v2.gadgetandgear.com/api/v2/product/storefront/search/suggestions', {
+            params: {
+                search: searchTerm
+            }
+        });
+
+        // Extract relevant fields: name, price, discounted_price, thumbnail
+        // Log or return the extracted data
+        return response.data?.data?.map(product => ({
+            id: crypto.randomUUID(),
+            name: product.name,
+            price: `${product.discounted_price}৳` || `${product.price}৳`,
+            // discounted_price: product.discounted_price,
+            img: `https://assets.gadgetandgear.com/upload/${product.thumbnail}`,
+            link: `https://gadgetandgear.com/product/${product.slug}`,
+        }));
+
+    } catch (error) {
+        console.error('Error fetching data:', error.message);
+        return [];
+    }
+};
 
 app.get("/scrape/:product", async (req, res) => {
   let product = req.params.product;
@@ -334,6 +360,7 @@ app.get("/scrape/:product", async (req, res) => {
     binaryProducts,
     // VibeGamingProducts,
     potakaProducts,
+    gadgetAndGearsProducts,
   ] = await Promise.all([
     scrapeStarTech(product),
     scrapeTechLand(product),
@@ -344,6 +371,7 @@ app.get("/scrape/:product", async (req, res) => {
     scrapeBinary(product),
     // scrapeVibeGaming(product),
     scrapePotakaIT(product),
+    scrapGadgetAndGears(product),
   ]);
 
   res.json([
@@ -400,6 +428,11 @@ app.get("/scrape/:product", async (req, res) => {
     // PcHouse: pchouseProducts,
     // UltraTech: ultraProducts,
     // SkyLand: skyLandProducts,
+    {
+        name: "GadgetAndGear",
+        products: gadgetAndGearsProducts,
+        logo: "https://gadgetandgear.com/_next/static/media/main-logo.8743dfef.svg",
+    },
   ]);
 });
 
