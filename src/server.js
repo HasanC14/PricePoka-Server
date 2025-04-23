@@ -1,26 +1,29 @@
 import app from "./app.js";
-
-const PORT = process.env.PORT || 3000;
-
-
-
-async function bootStrap() {
-  const server = app.listen(PORT, () =>
-    console.log(`Server running at http://localhost:${PORT}`)
-  );
-  const exitHandler = () => {
+let server
+async function main (){
+  try{
+      server = app.listen(5000, () => {
+          console.log(`app is listening on port ${5000}`);
+        });
+  
+  }catch(error){
+  console.log(error)
+  }
+  }
+  
+  main()
+  
+  process.on('unhandledRejection', (err) => {
+    console.log(`😈 unahandledRejection is detected , shutting down ...`, err);
     if (server) {
       server.close(() => {
-        console.log("Server closed");
+        process.exit(1);
       });
     }
     process.exit(1);
-  };
-  const unexpectedErrorHandler = (error) => {
-    console.error(error);
-    exitHandler();
-  };
-  process.on("uncaughtException", unexpectedErrorHandler);
-  process.on("unhandledRejection", unexpectedErrorHandler);
-}
-bootStrap();
+  });
+  
+  process.on('uncaughtException', () => {
+    console.log(`😈 uncaughtException is detected , shutting down ...`);
+    process.exit(1);
+  });
