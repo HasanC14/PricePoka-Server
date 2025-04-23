@@ -1,11 +1,11 @@
-import app from "./app";
-import { Server } from "http";
+import app from "./app.js";
+
 const PORT = process.env.PORT || 3000;
 
 
 
 async function bootStrap() {
-  const server: Server = app.listen(PORT, () =>
+  const server = app.listen(PORT, () =>
     console.log(`Server running at http://localhost:${PORT}`)
   );
   const exitHandler = () => {
@@ -16,7 +16,7 @@ async function bootStrap() {
     }
     process.exit(1);
   };
-  const unexpectedErrorHandler = (error: unknown) => {
+  const unexpectedErrorHandler = (error) => {
     console.error(error);
     exitHandler();
   };

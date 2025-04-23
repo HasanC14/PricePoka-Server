@@ -1,15 +1,6 @@
 
-type ScraperKey =
-  | "starTech"
-  | "techLand"
-  | "skyLand"
-  | "ryans"
-  | "pcHouse"
-  | "ultra"
-  | "binary"
-  | "potaka";
 
-export const scraperSources:{ key: ScraperKey; name: string }[] = [
+export const scraperSources = [
     { key: "starTech", name: "StarTech" },
     { key: "techLand", name: "TechLand" },
     { key: "skyLand", name: "SkyLand" },

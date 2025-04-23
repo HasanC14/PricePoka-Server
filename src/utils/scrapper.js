@@ -1,13 +1,13 @@
-import { fetchHtml, genId } from ".";
-import { Product, ScrapeResult } from "../interfaces/common";
+import { fetchHtml, genId } from "./index.js";
 
-export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
+
+export async function scrapeStarTech(product) {
   
   const url = `https://www.startech.com.bd/product/search?search=${encodeURIComponent(product)}`;
   
 
   const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $(".brand img").attr("src") || "logo not found";
   
     $(".p-item").each((_, element) => {
@@ -27,10 +27,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
   }
   
 
-  export async function scrapeTechLand(product: string): Promise<ScrapeResult> {
+  export async function scrapeTechLand(product) {
     const url = `https://www.techlandbd.com/index.php?route=product/search&search=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $("#logo img").attr("src") || "logo not found";
   
     $(".product-layout").each((_, element) => {
@@ -47,10 +47,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
   }
   
  
-  export async function scrapeRyans(product: string): Promise<ScrapeResult> {
+  export async function scrapeRyans(product) {
     const url = `https://www.ryans.com/search?q=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products= [];
     const logo = $(".main-logo img").attr("src") || "logo not found";
   
     $(".category-single-product").each((_, element) => {
@@ -66,10 +66,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
     return { name: "Ryans", products, logo };
   }
 
-  export async function scrapeBinary(product: string): Promise<ScrapeResult> {
+  export async function scrapeBinary(product) {
     const url = `https://www.binarylogic.com.bd/search/${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $(".homepage_two__log svg").attr("src") || "logo not found";
   
     $(".single_product").each((_, element) => {
@@ -86,10 +86,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
   }
   
 
-  export async function scrapePcHouse(product: string): Promise<ScrapeResult> {
+  export async function scrapePcHouse(product) {
     const url = `https://www.pchouse.com.bd/index.php?route=product/search&search=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $("#logo img").attr("src") || "logo not found";
   
     $(".product-layout").each((_, element) => {
@@ -106,10 +106,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
   }
   
 
-  export async function scrapeUltraTech(product: string): Promise<ScrapeResult> {
+  export async function scrapeUltraTech(product) {
     const url = `https://www.ultratech.com.bd/index.php?route=product/search&search=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $("#logo img").attr("src") || "logo not found";
   
     $(".product-layout").each((_, element) => {
@@ -126,10 +126,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
   }
   
 
-  export async function scrapeSkyLand(product: string): Promise<ScrapeResult> {
+  export async function scrapeSkyLand(product) {
     const url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $("#logo img").attr("src") || "logo not found";
   
     $(".product-layout").each((_, element) => {
@@ -145,10 +145,10 @@ export async function scrapeStarTech(product: string): Promise<ScrapeResult> {
     return { name: "SkyLand", products, logo };
   }
 
-  export async function scrapePotakaIT(product: string): Promise<ScrapeResult> {
+  export async function scrapePotakaIT(product) {
     const url = `https://www.potakait.com/index.php?route=product/search&search=${encodeURIComponent(product)}`;
     const $ = await fetchHtml(url);
-    const products: Product[] = [];
+    const products = [];
     const logo = $("#logo img").attr("src") || "logo not found";
   
     $(".product-layout").each((_, element) => {

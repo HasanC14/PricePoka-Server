@@ -1,5 +1,5 @@
 import express from "express";
-import ScraperRoutes from "../modules/Scraper/scrapper.route";
+import ScraperRoutes from "../modules/Scraper/scrapper.route.js";
 const router = express.Router();
 
 const moduleRoutes = [

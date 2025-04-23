@@ -1,6 +1,6 @@
-import { Scrapper } from "../../../utils/scrapper";
+import { Scrapper } from "../../../utils/scrapper.js";
 
-const getAllScrape = async (product: string) => {
+const getAllScrape = async (product) => {
     const [
       starTech,
       techLand,

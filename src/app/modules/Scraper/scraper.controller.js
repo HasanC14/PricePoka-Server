@@ -1,7 +1,7 @@
-import catchAsync from "../../../utils/catchAsync";
-import sendResponse from "../../../utils/sendResponse";
-import { scraperSources } from "../../constant";
-import { ScrapperService } from "./scraper.service";
+import catchAsync from "../../../utils/catchAsync.js";
+import sendResponse from "../../../utils/sendResponse.js";
+import { scraperSources } from "../../constant/index.js";
+import { ScrapperService } from "./scraper.service.js";
 
 const getAllScrape = catchAsync(async (req, res) => {
     let product = req.params.product;
