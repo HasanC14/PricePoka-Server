@@ -8,16 +8,23 @@ const getAllScrape = catchAsync(async (req, res) => {
     product = product.replace(/\s+/g, "%20");
     const scrapers = await ScrapperService.getAllScrape(product);
   
-  const response = scraperSources.map(({ key, name }) => ({
-    name,
-    products: scrapers[key]?.products,
-    logo: scrapers[key]?.logo,
-  }));
+   // Filter out vendors with no products
+   const filteredResponse = scraperSources.reduce((vendor, {key, name}) => {
+    const products = scrapers[key]?.products;
+    if(products && products?.length > 0){
+      vendor.push({
+        name, 
+        products,
+        logo: scrapers[key]?.logo,
+      })
+    }
+    return vendor;
+  }, [])
   sendResponse(res, {
     statusCode: 200,
     success: true,
     message: "Scraping data successfully",
-    data: response,
+    data: filteredResponse,
   });
 });
 export const ScrapperController= {
