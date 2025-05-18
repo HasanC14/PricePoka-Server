@@ -361,8 +361,7 @@ app.get("/scrape/:product", async (req, res) => {
     // scrapeVibeGaming(product),
     scrapePotakaIT(product),
   ]);
-
-  res.json([
+  const allShops = [
     {
       name: "StarTech",
       products: starTechProducts.products,
@@ -416,7 +415,9 @@ app.get("/scrape/:product", async (req, res) => {
     // PcHouse: pchouseProducts,
     // UltraTech: ultraProducts,
     // SkyLand: skyLandProducts,
-  ]);
+  ];
+  const shopsWithResults = allShops.filter((shop) => shop.products.length > 0);
+  res.json(shopsWithResults);
 });
 
 // Start the server
