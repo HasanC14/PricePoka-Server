@@ -335,19 +335,17 @@ const scrapePotakaIT = async (product) => {
 
     const $ = cheerio.load(response.data);
     const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
+    const logo = $(".brand-logo img").attr("src") || "logo not found";
+    $(".product-item").each((index, element) => {
+      const name =
+        $(element).find(".title a").text().trim() || "Name not found";
       const price =
-        $(element).find(".price-new").text().trim() ||
-        $(element).find(".price-normal").text().trim() ||
-        "Out Of Stock";
+        $(element).find(".price:not(.old)").text().trim() || "Out Of Stock";
       const img =
         $(element).find(".product-img img").attr("data-src") ||
-        $(element).find(".product-img img").attr("data-lazy") ||
+        $(element).find(".product-img img").attr("src") ||
         "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+      const link = $(element).find(".title a").attr("href") || "Link not found";
 
       const id = crypto.randomUUID();
       products.push({ id, name, price, img, link });
