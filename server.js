@@ -64,7 +64,10 @@ const scrapeStarTech = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping StarTech:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 
@@ -93,7 +96,10 @@ const scrapeTechLand = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 const scrapeRyans = async (product) => {
@@ -120,7 +126,10 @@ const scrapeRyans = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 const scrapeBinary = async (product) => {
@@ -148,7 +157,10 @@ const scrapeBinary = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 const scrapePcHouse = async (product) => {
@@ -175,7 +187,10 @@ const scrapePcHouse = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 
@@ -203,7 +218,10 @@ const scrapeUltraTech = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 // const scrapeVibeGaming = async (product) => {
@@ -257,7 +275,10 @@ const scrapeUltraTech = async (product) => {
 //     return { products, logo };
 //   } catch (error) {
 //     console.error("Error scraping TechLand:", error);
-//     return [];
+//     return {
+//   products: [],
+//   logo: "logo not found"
+// };
 //   }
 // };
 const scrapeSkyLand = async (product) => {
@@ -284,7 +305,10 @@ const scrapeSkyLand = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping TechLand:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 const scrapePotakaIT = async (product) => {
@@ -332,7 +356,10 @@ const scrapePotakaIT = async (product) => {
     return { products, logo };
   } catch (error) {
     console.error("Error scraping PotakaIt:", error);
-    return [];
+    return {
+      products: [],
+      logo: "logo not found",
+    };
   }
 };
 
