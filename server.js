@@ -7,9 +7,10 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 app.set("trust proxy", 1);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 app.use(cors());
 
+// Enhanced rate limiting
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 10,
@@ -23,432 +24,729 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-// Scraper for StarTech
+
+// Axios configuration with timeout and retry logic
+const axiosConfig = {
+  timeout: 10000, // 10 second timeout
+  headers: {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  },
+};
+
+// Helper function to create axios instance with retry logic
+const createAxiosInstance = () => {
+  const instance = axios.create(axiosConfig);
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const { config } = error;
+      if (!config || !config.retry) config.retry = 0;
+
+      if (config.retry < 2 && error.code !== "ECONNABORTED") {
+        config.retry += 1;
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * config.retry)
+        );
+        return instance(config);
+      }
+
+      return Promise.reject(error);
+    }
+  );
+
+  return instance;
+};
+
+const axiosInstance = createAxiosInstance();
+
+// Enhanced pagination function
+function getPaginationInfo($) {
+  try {
+    let pagination = $("ul.pagination");
+    if (!pagination.length) {
+      pagination = $('nav[aria-label="Pagination"] ul');
+    }
+    if (!pagination.length) return 1;
+
+    const nums = pagination
+      .find("li")
+      .map((i, el) => {
+        const t = $(el).text().trim();
+        return /^\d+$/.test(t) ? parseInt(t, 10) : null;
+      })
+      .get()
+      .filter((n) => n !== null && !isNaN(n));
+
+    return nums.length ? Math.max(...nums) : 1;
+  } catch (error) {
+    console.error("Error in getPaginationInfo:", error.message);
+    return 1;
+  }
+}
+
+// Enhanced scraping function with better error handling
 const scrapeStarTech = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.startech.com.bd/product/search?search=${product}`
-      // {
-      //   headers: {
-      //     "User-Agent":
-      //       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-      //     Accept:
-      //       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      //     "Accept-Language": "en-US,en;q=0.9",
-      //     Referer: "https://www.startech.com.bd/",
-      //     Connection: "keep-alive",
-      //     "Upgrade-Insecure-Requests": "1",
-      //   },
-      // }
-    );
+    do {
+      try {
+        const url = `https://www.startech.com.bd/product/search?search=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".brand img").attr("src") || "logo not found";
-    $(".p-item").each((index, element) => {
-      const name =
-        $(element).find(".p-item-name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() ||
-        $(element).find(".p-item-price").text().trim() ||
-        "Out Of Stock";
+        if (pageNum === 1) {
+          const logoSrc = $(".brand img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.startech.com.bd${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-      const img =
-        $(element).find(".p-item-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".p-item-img a").attr("href") || "Link not found";
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        $(".p-item").each((_, el) => {
+          try {
+            const name =
+              $(el).find(".p-item-name").text().trim() || "Name not found";
+            const price =
+              $(el).find(".price-new").text().trim() ||
+              $(el).find(".p-item-price").text().trim() ||
+              "Out Of Stock";
+            const imgSrc = $(el).find(".p-item-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.startech.com.bd${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".p-item-img a").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.startech.com.bd${linkHref}`
+              : "Link not found";
 
-    return { products, logo };
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing StarTech item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping StarTech page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10); // Limit to 10 pages max
   } catch (error) {
-    console.error("Error scraping StarTech:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping StarTech:", error.message);
   }
+
+  return { products, logo };
 };
 
-// Scraper for TechLand
 const scrapeTechLand = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.techlandbd.com/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".image img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.techlandbd.com/search/advance/product/result/${encodeURIComponent(
+          product
+        )}?page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $(".py-1.text-white.bg-gradient-to-r img").attr(
+            "src"
+          );
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.techlandbd.com${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".grid > .h-full").each((_, el) => {
+          try {
+            const name =
+              $(el).find(".text-gray-800").text().trim() || "Name not found";
+            const hasStrike = $(el).find(".line-through").length > 0;
+            let raw = hasStrike
+              ? $(el).find("span.font-bold.text-red-600").text().trim()
+              : $(el).find(".text-lg").text().trim();
+
+            raw = raw || "";
+            const price = /out of stock/i.test(raw) ? "Out of Stock" : raw;
+
+            const imgSrc = $(el).find("img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.techlandbd.com${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find("a").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.techlandbd.com${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing TechLand item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping TechLand page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping TechLand:", error.message);
   }
+
+  return { products, logo };
 };
+
 const scrapeRyans = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.ryans.com/search?q=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".main-logo img").attr("src") || "logo not found";
-    $(".category-single-product").each((index, element) => {
-      const name =
-        $(element).find(".card-text a").text().trim() || "Name not found";
-      const price = $(element).find(".pr-text").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".image-box img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".image-box a").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.ryans.com/search?q=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $(".main-logo img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.ryans.com${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".category-single-product").each((_, el) => {
+          try {
+            const name =
+              $(el).find(".card-text a").text().trim() || "Name not found";
+            const price =
+              $(el).find(".pr-text").text().trim() || "Out Of Stock";
+            const imgSrc = $(el).find(".image-box img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.ryans.com${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".image-box a").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.ryans.com${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing Ryans item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping Ryans page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping Ryans:", error.message);
   }
+
+  return { products, logo };
 };
+
 const scrapeBinary = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.binarylogic.com.bd/search/${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".homepage_two__log svg").attr("src") || "logo not found";
-    $(".single_product").each((index, element) => {
-      const name =
-        $(element).find(".p-item-name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".current_price").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".p-item-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".p-item-img a").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.binarylogic.com.bd/search/${encodeURIComponent(
+          product
+        )}?page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $(".homepage_two__log svg").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.binarylogic.com.bd${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".single_product").each((_, el) => {
+          try {
+            const name =
+              $(el).find(".p-item-name").text().trim() || "Name not found";
+            const price =
+              $(el).find(".current_price").text().trim() || "Out Of Stock";
+            const imgSrc = $(el).find(".p-item-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.binarylogic.com.bd${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".p-item-img a").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.binarylogic.com.bd${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing Binary item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping Binary page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping Binary:", error.message);
   }
+
+  return { products, logo };
 };
+
 const scrapePcHouse = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.pchouse.com.bd/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.pchouse.com.bd/index.php?route=product/search&search=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $("#logo img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.pchouse.com.bd${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".product-layout").each((_, el) => {
+          try {
+            const name = $(el).find(".name").text().trim() || "Name not found";
+            const price =
+              $(el).find(".price-new").text().trim() || "Out Of Stock";
+            const imgSrc = $(el).find(".product-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.pchouse.com.bd${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".product-img").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.pchouse.com.bd${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing PcHouse item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping PcHouse page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping PcHouse:", error.message);
   }
+
+  return { products, logo };
 };
 
 const scrapeUltraTech = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.ultratech.com.bd/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.ultratech.com.bd/index.php?route=product/search&search=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $("#logo img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.ultratech.com.bd${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".product-layout").each((_, el) => {
+          try {
+            const name = $(el).find(".name").text().trim() || "Name not found";
+            const price =
+              $(el).find(".price-new").text().trim() || "Out Of Stock";
+            const imgSrc = $(el).find(".product-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.ultratech.com.bd${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".product-img").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.ultratech.com.bd${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(
+              `Error processing UltraTech item:`,
+              itemError.message
+            );
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping UltraTech page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping UltraTech:", error.message);
   }
+
+  return { products, logo };
 };
-// const scrapeVibeGaming = async (product) => {
-//   try {
-//     const response = await axios.get(
-//       `https://vibegaming.com.bd/?s=${product}&post_type=product`,
-//       {
-//         headers: {
-//           "X-Forwarded-For": "119.30.41.88",
-//         },
-//       }
-//     );
 
-//     const $ = cheerio.load(response.data);
-//     const products = [];
-//     const logo = $(".sticky-logo").attr("data-src") || "logo not found";
-//     $(".product").each((index, element) => {
-//       const name =
-//         $(element).find(".product-name").text().trim() || "Name not found";
-
-//       let lowestPrice = 0;
-//       const priceElements = $(element).find(".amount");
-
-//       if (priceElements.length > 0) {
-//         let min = Infinity;
-//         priceElements.each((i, el) => {
-//           const text = $(el)
-//             .text()
-//             .replace(/[^\d.]/g, "");
-//           const value = parseFloat(text);
-//           if (!isNaN(value) && value < min) {
-//             min = value;
-//           }
-//         });
-//         if (min !== Infinity) {
-//           lowestPrice = `৳${min.toLocaleString()}`;
-//         }
-//       }
-
-//       const img =
-//         $(element).find(".no-back-image img").attr("data-src") ||
-//         "Image not found";
-//       const link =
-//         $(element).find(".thumbnail-wrapper a").attr("href") ||
-//         "Link not found";
-//       const id = crypto.randomUUID();
-
-//       products.push({ id, name, price: lowestPrice, img, link });
-//     });
-
-//     return { products, logo };
-//   } catch (error) {
-//     console.error("Error scraping TechLand:", error);
-//     return {
-//   products: [],
-//   logo: "logo not found"
-// };
-//   }
-// };
 const scrapeSkyLand = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.skyland.com.bd/index.php?route=product/search&search=${product}`
-    );
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $("#logo img").attr("src") || "logo not found";
-    $(".product-layout").each((index, element) => {
-      const name = $(element).find(".name").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price-new").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("src") || "Image not found";
-      const link =
-        $(element).find(".product-img").attr("href") || "Link not found";
+    do {
+      try {
+        const url = `https://www.skyland.com.bd/index.php?route=product/search&search=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        if (pageNum === 1) {
+          const logoSrc = $("#logo img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.skyland.com.bd${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-    return { products, logo };
+        $(".product-layout").each((_, el) => {
+          try {
+            const name = $(el).find(".name").text().trim() || "Name not found";
+            const price =
+              $(el).find(".price-new").text().trim() || "Out Of Stock";
+            const imgSrc = $(el).find(".product-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.skyland.com.bd${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".product-img").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.skyland.com.bd${linkHref}`
+              : "Link not found";
+
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing SkyLand item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping SkyLand page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping TechLand:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping SkyLand:", error.message);
   }
+
+  return { products, logo };
 };
+
 const scrapePotakaIT = async (product) => {
+  const products = [];
+  let logo = "logo not found";
+  let pageNum = 1;
+  let totalPages = 1;
+
   try {
-    const response = await axios.get(
-      `https://www.potakait.com/index.php?route=product/search&search=${product}`
-      // {
-      //   headers: {
-      //     "User-Agent":
-      //       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
-      //     Accept: "application/json, text/plain, */*",
-      //     "Accept-Encoding": "gzip, deflate, br",
-      //     Connection: "keep-alive",
-      //     "Upgrade-Insecure-Requests": "1",
-      //     "Cache-Control": "max-age=0",
-      //     TE: "Trailers",
-      //     DNT: "1", // Do Not Track header
-      //     Referer: "https://www.potakait.com", // Referer header may help
-      //     Origin: "https://www.potakait.com", // Sometimes needed
-      //     Cookie: "ar_debug=1",
-      //   },
-      // }
-    );
+    do {
+      try {
+        const url = `https://www.potakait.com/index.php?route=product/search&search=${encodeURIComponent(
+          product
+        )}&page=${pageNum}`;
+        const { data } = await axiosInstance.get(url);
+        const $ = cheerio.load(data);
 
-    const $ = cheerio.load(response.data);
-    const products = [];
-    const logo = $(".brand-logo img").attr("src") || "logo not found";
-    $(".product-item").each((index, element) => {
-      const name =
-        $(element).find(".title a").text().trim() || "Name not found";
-      const price =
-        $(element).find(".price:not(.old)").text().trim() || "Out Of Stock";
-      const img =
-        $(element).find(".product-img img").attr("data-src") ||
-        $(element).find(".product-img img").attr("src") ||
-        "Image not found";
-      const link = $(element).find(".title a").attr("href") || "Link not found";
+        if (pageNum === 1) {
+          const logoSrc = $(".brand-logo img").attr("src");
+          if (logoSrc) {
+            logo = logoSrc.startsWith("http")
+              ? logoSrc
+              : `https://www.potakait.com${logoSrc}`;
+          }
+          totalPages = getPaginationInfo($);
+        }
 
-      const id = crypto.randomUUID();
-      products.push({ id, name, price, img, link });
-    });
+        $(".product-item").each((_, el) => {
+          try {
+            const name =
+              $(el).find(".title a").text().trim() || "Name not found";
+            const price =
+              $(el).find(".price:not(.old)").text().trim() || "Out Of Stock";
+            const imgSrc =
+              $(el).find(".product-img img").attr("data-src") ||
+              $(el).find(".product-img img").attr("src");
+            const img = imgSrc
+              ? imgSrc.startsWith("http")
+                ? imgSrc
+                : `https://www.potakait.com${imgSrc}`
+              : "Image not found";
+            const linkHref = $(el).find(".title a").attr("href");
+            const link = linkHref
+              ? linkHref.startsWith("http")
+                ? linkHref
+                : `https://www.potakait.com${linkHref}`
+              : "Link not found";
 
-    return { products, logo };
+            products.push({ id: crypto.randomUUID(), name, price, img, link });
+          } catch (itemError) {
+            console.error(`Error processing PotakaIT item:`, itemError.message);
+          }
+        });
+
+        pageNum++;
+      } catch (pageError) {
+        console.error(
+          `Error scraping PotakaIT page ${pageNum}:`,
+          pageError.message
+        );
+        break;
+      }
+    } while (pageNum <= totalPages && pageNum <= 10);
   } catch (error) {
-    console.error("Error scraping PotakaIt:", error);
-    return {
-      products: [],
-      logo: "logo not found",
-    };
+    console.error("Error scraping PotakaIT:", error.message);
   }
+
+  return { products, logo };
 };
 
+// Enhanced main scraping endpoint with parallel execution and error handling
 app.get("/scrape/:product", async (req, res) => {
-  let product = req.params.product;
-  product = product.replace(/\s+/g, "%20");
+  try {
+    let product = req.params.product;
+    if (!product || product.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Product parameter is required",
+      });
+    }
 
-  const [
-    starTechProducts,
-    techLandProducts,
-    skyLandProducts,
-    ryansProducts,
-    pchouseProducts,
-    ultraProducts,
-    binaryProducts,
-    // VibeGamingProducts,
-    potakaProducts,
-  ] = await Promise.all([
-    scrapeStarTech(product),
-    scrapeTechLand(product),
-    scrapeSkyLand(product),
-    scrapeRyans(product),
-    scrapePcHouse(product),
-    scrapeUltraTech(product),
-    scrapeBinary(product),
-    // scrapeVibeGaming(product),
-    scrapePotakaIT(product),
-  ]);
-  const allShops = [
-    {
-      name: "StarTech",
-      products: starTechProducts.products,
-      logo: starTechProducts.logo,
-    },
-    {
-      name: "TechLand",
-      products: techLandProducts.products,
-      logo: techLandProducts.logo,
-    },
-    {
-      name: "SkyLand",
-      products: skyLandProducts.products,
-      logo: skyLandProducts.logo,
-    },
-    {
-      name: "Ryans",
-      products: ryansProducts.products,
-      logo: ryansProducts.logo,
-    },
+    product = product.replace(/\s+/g, "%20");
 
-    {
-      name: "PcHouse",
-      products: pchouseProducts.products,
-      logo: pchouseProducts.logo,
-    },
-    {
-      name: "UltraTech",
-      products: ultraProducts.products,
-      logo: ultraProducts.logo,
-    },
-    // {
-    //   name: "Vibe Gaming",
-    //   products: VibeGamingProducts.products,
-    //   logo: VibeGamingProducts.logo,
-    // },
-    {
-      name: "Binary",
-      products: binaryProducts.products,
-      logo: binaryProducts.logo,
-    },
-    {
-      name: "PotakaIT",
-      products: potakaProducts.products,
-      logo: potakaProducts.logo,
-    },
-    // TechLand: techLandProducts,
-    // Ryans: ryansProducts,
-    // Binary: binaryProducts,
-    // PotakaIT: potakaProducts,
-    // PcHouse: pchouseProducts,
-    // UltraTech: ultraProducts,
-    // SkyLand: skyLandProducts,
-  ];
-  const shopsWithResults = allShops.filter((shop) => shop.products.length > 0);
-  res.json(shopsWithResults);
+    console.log(`Starting scrape for product: ${product}`);
+    const startTime = Date.now();
+
+    // Use Promise.allSettled to ensure all scrapers run independently
+    const results = await Promise.allSettled([
+      scrapeStarTech(product),
+      scrapeTechLand(product),
+      scrapeSkyLand(product),
+      scrapePcHouse(product),
+      scrapeUltraTech(product),
+      scrapeBinary(product),
+      scrapePotakaIT(product),
+      scrapeRyans(product),
+    ]);
+
+    const shopNames = [
+      "StarTech",
+      "TechLand",
+      "SkyLand",
+      "PcHouse",
+      "UltraTech",
+      "Binary",
+      "PotakaIT",
+      "Ryans",
+    ];
+    const allShops = [];
+    let failedShops = [];
+
+    results.forEach((result, index) => {
+      const shopName = shopNames[index];
+      if (result.status === "fulfilled") {
+        const { products, logo } = result.value;
+        allShops.push({
+          name: shopName,
+          products: products || [],
+          logo: logo || "logo not found",
+        });
+        console.log(`${shopName}: ${products?.length || 0} products found`);
+      } else {
+        console.error(
+          `${shopName} failed:`,
+          result.reason?.message || "Unknown error"
+        );
+        failedShops.push(shopName);
+        // Still add the shop with empty products to maintain consistency
+        allShops.push({
+          name: shopName,
+          products: [],
+          logo: "logo not found",
+        });
+      }
+    });
+
+    const shopsWithResults = allShops.filter(
+      (shop) => shop.products.length > 0
+    );
+    const totalProducts = shopsWithResults.reduce(
+      (sum, shop) => sum + shop.products.length,
+      0
+    );
+    const endTime = Date.now();
+
+    console.log(
+      `Scraping completed in ${
+        endTime - startTime
+      }ms. Total products: ${totalProducts}`
+    );
+
+    if (failedShops.length > 0) {
+      console.log(`Failed shops: ${failedShops.join(", ")}`);
+    }
+
+    res.json({
+      success: true,
+      data: shopsWithResults,
+      metadata: {
+        totalShops: shopsWithResults.length,
+        totalProducts,
+        failedShops,
+        executionTime: endTime - startTime,
+      },
+    });
+  } catch (error) {
+    console.error("Error in scrape endpoint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error occurred while scraping",
+      error: error.message,
+    });
+  }
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Start the server
-app.listen(PORT, () =>
-  console.log(`Server running at http://localhost:${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Health check available at http://localhost:${PORT}/health`);
+});
+
 app.get("/", (req, res) => {
   res.send("Welcome to the PricePoka's Scraper API!");
 });
